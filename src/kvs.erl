@@ -14,6 +14,19 @@
 -export(?STREAM).
 -export([init/1, start/2, stop/1]).
 
+-export([fields/1, get_field/2, get_value/2]).
+fields(Table)      -> T = table(Table),
+                    case T of
+                        false -> [];
+                        _V -> T#table.fields
+                    end
+.
+
+get_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
+                                Index = string:str(FieldsList, [Field]) + 1,
+                                element(Index, TableRecord).    
+
+
 -record('$msg', {id,next,prev,user,msg}).
 
 init([]) -> {ok, { {one_for_one, 5, 10}, []} }.
@@ -28,6 +41,10 @@ kvs_stream()       -> application:get_env(kvs,dba_st,kvs_stream).
 all(Table)         -> all     (Table, #kvs{mod=dba()}).
 delete(Table,Key)  -> delete  (Table, Key, #kvs{mod=dba()}).
 get(Table,Key)     -> ?MODULE:get     (Table, Key, #kvs{mod=dba()}).
+get_value(Table, Key) -> case get(Table, Key) of
+                            {ok, Value} -> Value;
+                            _ -> []
+                         end.
 index(Table,K,V)   -> index   (Table, K,V, #kvs{mod=dba()}).
 join()             -> join    ([],    #kvs{mod=dba()}).
 dump()             -> dump    (#kvs{mod=dba()}).
