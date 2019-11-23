@@ -3,8 +3,11 @@
 -include("kvs.hrl").
 -include("stream.hrl").
 -include("metainfo.hrl").
--export(?STREAM).
--export([prev/8]).
+-compile(export_all).
+% -export(?STREAM).
+% -export([prev/8, append/3]).
+
+
 
 ref() -> kvs_rocks:ref().
 
@@ -73,11 +76,18 @@ load_reader (Id) ->
               _ -> #reader{id=[]} end.
 
 writer (Id) -> case kvs:get(writer,Id) of {ok,W} -> W; {error,_} -> #writer{id=Id} end.
+get_writer(Id) -> case kvs:get(writer, Id) of
+                     {ok, W} -> W;
+                     {error,_} -> W0 = #writer{id = Id},
+                                  kvs:save(W0),
+                                  W0
+                 end. 
+
 reader (Id) ->
     case kvs:get(writer,Id) of
          {ok,#writer{}} ->
              {ok,I} = rocksdb:iterator(ref(), []),
-             #reader{id=kvs:seq([],[]),feed=Id,cache=I};
+             #reader{id=kvs:seq(),feed=Id,cache=I};
          {error,_} -> #reader{} end.
 save (C) -> NC = c4(C,[]), N2 = c3(NC,[]), kvs:put(N2), N2.
 
@@ -94,12 +104,20 @@ add(M,#writer{id=Feed,count=S}=C) -> NS=S+1,
          (term_to_binary(id(M)))/binary>>, term_to_binary(M), [{sync,true}]),
     C#writer{cache=M,count=NS}.
 
-append(Rec,Feed) ->
-   kvs:ensure(#writer{id=Feed}),
-   Id = element(2,Rec),
-   case kvs:get(Feed,Id) of
-        {ok,_}    -> Id;
-        {error,_} -> kvs:save(kvs:add((kvs:writer(Feed))#writer{args=Rec})), Id end.
+append(Rec,Feed) -> append(Rec, Feed, false).
+
+append(Rec, Feed, Modify) -> 
+     Name = element(1,Rec),
+     Id = element(2,Rec),
+     case kvs:get(Name, Id) of
+          {ok, _}    -> case Modify of
+                              true -> kvs:put(Rec);
+                              false -> skip
+                         end;
+          {error,_} ->  W = kvs:get_writer(Feed), 
+                         kvs:save(kvs:add(W#writer{args=Rec}))
+     end,
+     Id.
 
 prev(_,_,_,_,_,_,N,C) when C == N -> C;
 prev(I,Key,S,{ok,A,X},_,T,N,C) -> prev(I,Key,S,A,X,T,N,C);

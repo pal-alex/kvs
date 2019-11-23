@@ -4,6 +4,7 @@
 -include("metainfo.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 -export(?BACKEND).
+-export([seq/0]).
 -export([ref/0,next/8,format/1]).
 
 start()    -> ok.
@@ -24,7 +25,8 @@ get(Tab, Key) ->
 %    io:format("KVS.GET.Address: ~s~n",[Address]),
     case rocksdb:get(ref(), Address, []) of
          not_found -> {error,not_found};
-         {ok,Bin} -> {ok,binary_to_term(Bin,[safe])} end.
+        %  {ok,Bin} -> {ok,binary_to_term(Bin,[safe])} end.
+          {ok,Bin} -> {ok,binary_to_term(Bin)} end.
 
 put(Records) when is_list(Records) -> lists:map(fun(Record) -> put(Record) end, Records);
 put(Record) -> 
@@ -54,11 +56,31 @@ next(_,___,_,{error,_},_,T,_,_) -> T;
 next(I,Key,S,A,X,T,N,C) when size(A) > S ->
      case binary:part(A,0,S) of Key ->
           next(I,Key,S,rocksdb:iterator_move(I, next), [],
-                       [binary_to_term(X,[safe])|T],N,C+1);
+                    %    [binary_to_term(X,[safe])|T],N,C+1);
+                    [binary_to_term(X)|T],N,C+1);
                   _ -> T end;
 next(_,_,_,_,_,T,_,_) -> T.
 
-seq(_,_) -> integer_to_list(erlang:system_time(nano_seconds)).
+% seq(_,_) -> %{_, Key} = zuuid:v1(), Key.
+                              
+%         Key = integer_to_list(erlang:system_time(nano_seconds)),
+%         io:format("new key ~p~n", [Key]),
+%         Key
+%           
+seq() ->  integer_to_list(erlang:system_time(nano_seconds)) .
+seq([],[]) -> seq(global_seq, 1); 
+% seq([],[]) -> %PropList = hd(lists:reverse(lists:map(fun (_) -> erlang:system_info(os_monotonic_time_source)end, lists:seq(1,100)))),
+%               %Key = proplists:get_value(time, PropList),
+%               Key = integer_to_list(element(2,hd(lists:reverse(erlang:system_info(os_monotonic_time_source))))),
+%               io:format("new key ~p~n", [Key]),
+%               Key
+%         ;
+seq(RecordName, Incr) -> Key = kvs_mnesia:seq(RecordName, Incr),
+                         io:format("new key ~p~n", [Key]),
+                         integer_to_list(Key)
+.
+
+
 create_table(_,_) -> [].
 add_table_index(_, _) -> ok.
 dump() -> ok.

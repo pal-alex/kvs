@@ -9,18 +9,21 @@
 -include("cursors.hrl").
 -include("kvs.hrl").
 -include("backend.hrl").
+-export([seq/0]).
 -export([dump/0,check/0,metainfo/0,ensure/1,seq_gen/0,fold/6,fold/7,head/1,head/2]).
 -export(?API).
 -export(?STREAM).
 -export([init/1, start/2, stop/1]).
 
--export([fields/1, get_field/2, get_value/2]).
+-export([fields/1, has_field/2, get_field/2, get_value/2, get_value/3, append/3]).
 fields(Table)      -> T = table(Table),
                     case T of
                         false -> [];
                         _V -> T#table.fields
                     end
 .
+has_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
+                                 lists:member(Field, FieldsList).
 
 get_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
                                 Index = string:str(FieldsList, [Field]) + 1,
@@ -29,7 +32,8 @@ get_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
 
 -record('$msg', {id,next,prev,user,msg}).
 
-init([]) -> {ok, { {one_for_one, 5, 10}, []} }.
+init([]) -> %zuuid:start(),
+            {ok, { {one_for_one, 5, 10}, []} }.
 start(_,_) -> supervisor:start_link({local, kvs}, kvs, []).
 stop(_) -> ok.
 test_tabs() -> [ #table{name='$msg', fields=record_info(fields,'$msg')} ].
@@ -41,10 +45,11 @@ kvs_stream()       -> application:get_env(kvs,dba_st,kvs_stream).
 all(Table)         -> all     (Table, #kvs{mod=dba()}).
 delete(Table,Key)  -> delete  (Table, Key, #kvs{mod=dba()}).
 get(Table,Key)     -> ?MODULE:get     (Table, Key, #kvs{mod=dba()}).
-get_value(Table, Key) -> case get(Table, Key) of
-                            {ok, Value} -> Value;
-                            _ -> []
-                         end.
+get_value(Table, Key) -> get_value(Table, Key, []).
+get_value(Table, Key, Default) -> case get(Table, Key) of
+                                        {ok, Value} -> Value;
+                                        _ -> Default
+                                  end.
 index(Table,K,V)   -> index   (Table, K,V, #kvs{mod=dba()}).
 join()             -> join    ([],    #kvs{mod=dba()}).
 dump()             -> dump    (#kvs{mod=dba()}).
@@ -58,6 +63,7 @@ start()            -> start   (#kvs{mod=dba()}).
 ver()              -> ver(#kvs{mod=dba()}).
 dir()              -> dir     (#kvs{mod=dba()}).
 feed(Key)          -> feed    (Key, #kvs{mod=dba()}).
+seq()              -> seq(#kvs{mod=dba()}).
 seq(Table,DX)      -> seq     (Table, DX, #kvs{mod=dba()}).
 
 % stream api
@@ -72,8 +78,10 @@ save (X) -> (kvs_stream()):save(X).
 cut  (X,Y) -> (kvs_stream()):cut (X,Y).
 add  (X) -> (kvs_stream()):add (X).
 append  (X, Y) -> (kvs_stream()):append (X, Y).
+append  (X, Y, Z) -> (kvs_stream()):append (X, Y, Z).
 load_reader (X) -> (kvs_stream()):load_reader(X).
 writer      (X) -> (kvs_stream()):writer(X).
+get_writer      (X) -> (kvs_stream()):get_writer(X).
 reader      (X) -> (kvs_stream()):reader(X).
 ensure(#writer{id=Id}) ->
    case kvs:get(writer,Id) of
@@ -133,6 +141,7 @@ get(RecordName, Key, #kvs{mod=Mod}) -> Mod:get(RecordName, Key).
 delete(Tab, Key, #kvs{mod=Mod}) -> Mod:delete(Tab, Key).
 count(Tab,#kvs{mod=DBA}) -> DBA:count(Tab).
 index(Tab, Key, Value,#kvs{mod=DBA}) -> DBA:index(Tab, Key, Value).
+seq(#kvs{mod=DBA}) ->  DBA:seq().
 seq(Tab, Incr,#kvs{mod=DBA}) -> DBA:seq(Tab, Incr).
 dump(#kvs{mod=Mod}) -> Mod:dump().
 feed(Key,#kvs{st=Mod}) -> Mod:feed(Key).
