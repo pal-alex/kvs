@@ -4,9 +4,12 @@
 -include("metainfo.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 -export(?BACKEND).
--export([ref/0,next/8,format/1,bt/1]).
+-export([seq/0]).
+-export([ref/0,next/8,format/1,bt/1,bt/2]).
 
-bt(X)      -> binary_to_term(X,[safe]).
+bt(X)      -> bt(X,false).
+bt(X, true)      -> binary_to_term(X,[safe]).
+bt(X, false)      -> binary_to_term(X).
 start()    -> ok.
 stop()     -> ok.
 destroy()  -> ok.
@@ -59,12 +62,14 @@ next(I,Key,S,A,X,T,N,C) when size(A) > S ->
                   _ -> T end;
 next(_,_,_,_,_,T,_,_) -> T.
 
-seq(_,_) ->
-  case os:type() of
-       {win32,nt} -> {Mega,Sec,Micro} = erlang:now(), integer_to_list((Mega*1000000+Sec)*1000000+Micro);
-                _ -> erlang:integer_to_list(element(2,hd(lists:reverse(erlang:system_info(os_monotonic_time_source)))))
-  end.
-
+%seq(_,_) ->
+%  case os:type() of
+%       {win32,nt} -> {Mega,Sec,Micro} = erlang:now(), integer_to_list((Mega*1000000+Sec)*1000000+Micro);
+%                _ -> erlang:integer_to_list(element(2,hd(lists:reverse(erlang:system_info(os_monotonic_time_source)))))
+%  end.
+seq(RecordName, Incr) -> Key = kvs_mnesia:seq(RecordName, Incr),
+                         io:format("new key ~p~n", [Key]),
+                         integer_to_list(Key)
 create_table(_,_) -> [].
 add_table_index(_, _) -> ok.
 dump() -> ok.

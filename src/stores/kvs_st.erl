@@ -3,8 +3,9 @@
 -include("kvs.hrl").
 -include("stream.hrl").
 -include("metainfo.hrl").
--export(?STREAM).
--export([prev/8,ref/0,feed_key/2]).
+-compile(export_all).
+%-export(?STREAM).
+%-export([prev/8, append/3, ref/0,feed_key/2]).
 
 bt(X) -> kvs_rocks:bt(X).
 ref() -> kvs_rocks:ref().
@@ -81,7 +82,13 @@ load_reader (Id) ->
               _ -> #reader{id=[]} end.
 
 writer (Id) -> case kvs:get(writer,Id) of {ok,W} -> W; {error,_} -> #writer{id=Id} end.
-reader (Id) ->
+get_writer(Id) -> case kvs:get(writer, Id) of
+                     {ok, W} -> W;
+                     {error,_} -> W0 = #writer{id = Id},
+                                  kvs:save(W0),
+                                  W0
+                 end.
+ reader (Id) ->
     case kvs:get(writer,Id) of
          {ok,#writer{id=Feed}} ->
              Key = list_to_binary(lists:concat(["/",kvs_rocks:format(Feed)])),
@@ -92,7 +99,7 @@ reader (Id) ->
          {error,_} -> #reader{} end.
 save (C) -> NC = c4(C,[]), kvs:put(NC), NC.
 
-% add
+feed(Key) -> kvs:all(Key).% add
 
 add(#writer{args=M}=C) when element(2,M) == [] -> add(si(M,kvs:seq([],[])),C);
 add(#writer{args=M}=C) -> add(M,C).
@@ -114,13 +121,27 @@ remove(Rec,Feed) ->
               Count;
          _ -> C end.
 
-append(Rec,Feed) ->
-   kvs:ensure(#writer{id=Feed}),
-   Id = element(2,Rec),
-   W = kvs:writer(Feed),
-   case kvs:get(Feed,Id) of
-        {ok,_}    -> raw_append(Rec,Feed), kvs:save(W#writer{cache=Rec,count=W#writer.count + 1}), Id;
-        {error,_} -> kvs:save(kvs:add(W#writer{args=Rec,cache=Rec})), Id end.
+%append(Rec,Feed) ->
+%   kvs:ensure(#writer{id=Feed}),
+%   Id = element(2,Rec),
+%   W = kvs:writer(Feed),
+%   case kvs:get(Feed,Id) of
+%        {ok,_}    -> raw_append(Rec,Feed), kvs:save(W#writer{cache=Rec,count=W#writer.count + 1}), Id;
+%        {error,_} -> kvs:save(kvs:add(W#writer{args=Rec,cache=Rec})), Id end.
+
+append(Rec,Feed) -> append(Rec, Feed, false).
+append(Rec, Feed, Modify) -> 
+     Name = element(1,Rec),
+     Id = element(2,Rec),
+     case kvs:get(Name, Id) of
+          {ok, _}    -> case Modify of
+                              true -> raw_append(Rec,Feed), kvs:save(W#writer{cache=Rec,count=W#writer.count + 1});
+                              false -> skip
+                         end;
+          {error,_} ->  W = kvs:get_writer(Feed), 
+                         kvs:save(kvs:add(W#writer{args=Rec,cache=Rec}))
+     end,
+     Id.
 
 prev(_,_,_,_,_,_,N,C) when C == N -> C;
 prev(I,Key,S,{ok,A,X},_,T,N,C) -> prev(I,Key,S,A,X,T,N,C);
