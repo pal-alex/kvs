@@ -54,28 +54,20 @@ w({error,X},_,_)                          -> {error,X}.
 drop(#reader{cache=[]}=C) -> C#reader{args=[]};
 drop(#reader{dir=D,cache=B,args=N,pos=P}=C)  -> drop(acc(D),N,C,C,P,B).
 take(#reader{cache=[]}=C) -> C#reader{args=[]};
-take(#reader{dir=D,cache=B,args=N,pos=P}=C)  -> take(acc(D),N,C,C,[],P,B).
+take(#reader{dir=D,cache=B,args=N,pos=P}=C)  -> take(acc(D),N,C,C,[],P).
 
-take(_,_,{error,_},C2,R,P,B) -> C2#reader{args=lists:flatten(R),pos=P,cache=B};
-take(_,0,_,C2,R,P,B)         -> C2#reader{args=lists:flatten(R),pos=P,cache=B};
-take(A,N,#reader{cache={T,I},pos=P}=C,C2,R,_,_) ->
-    take(A,N-1,?MODULE:A(C),C2,[element(2,kvs:get(T,I))|R],P,{T,I}).
+take(_,_,{error,_},C2,R,P) -> C2#reader{args=lists:flatten(R),pos=P,cache={tab(hd(R)),en(hd(R))}};
+take(_,0,_,C2,R,P)         -> C2#reader{args=lists:flatten(R),pos=P,cache={tab(hd(R)),en(hd(R))}};
+take(A,N,#reader{cache={T,I},pos=P}=C,C2,R,_) -> take(A,N-1,?MODULE:A(C),C2,[element(2,kvs:get(T,I))|R],P).
 
 drop(_,_,{error,_},C2,P,B)     -> C2#reader{pos=P,cache=B};
 drop(_,0,_,C2,P,B)             -> C2#reader{pos=P,cache=B};
-drop(A,N,#reader{cache=B,pos=P}=C,C2,_,_) ->
-    drop(A,N-1,?MODULE:A(C),C2,P,B).
+drop(A,N,#reader{cache=B,pos=P}=C,C2,_,_) -> drop(A,N-1,?MODULE:A(C),C2,P,B).
 
 % new, save, load, up, down, top, bot
 
 load_reader (Id) -> case kvs:get(reader,Id) of {ok,C} -> C; _ -> #reader{id=[]} end.
 
-get_writer(Id) -> case kvs:get(writer, Id) of
-                     {ok, W} -> W;
-                     {error,_} -> W0 = #writer{id = Id},
-                                  kvs:save(W0),
-                                  W0
-                 end. 
 writer (Id) -> case kvs:get(writer,Id) of {ok,W} -> W; {error,_} -> #writer{id=Id} end.
 reader (Id) -> case kvs:get(writer,Id) of
          {ok,#writer{first=[]}} -> #reader{id=kvs:seq(reader,1),feed=Id,cache=[]};
@@ -84,15 +76,6 @@ reader (Id) -> case kvs:get(writer,Id) of
 save (C) -> NC = c4(C,[]), kvs:put(NC), NC.
 
 % add
-
-feed(Key) -> R = kvs:reader(Key),
-        case R#reader.id of
-            [] -> [];
-            _V -> RA = R#reader{args=-1},
-                  T = kvs:take(RA),
-                  T#reader.args
-        end
-.
 
 add(#writer{args=M}=C) when element(2,M) == [] -> add(si(M,kvs:seq(tab(M),1)),C);
 add(#writer{args=M}=C) -> add(M,C).
@@ -110,20 +93,19 @@ add(M,#writer{cache=V1,count=S}=C) ->
     N=sp(sn(M,[]),id(V)), P=sn(V,id(M)), kvs:put([N,P]),
     C#writer{cache=N,count=S+1}.
 
-append(Rec,Feed) -> append(Rec, Feed, false).
-   
-append(Rec, Feed, Modify) -> 
-    Name = element(1,Rec),
-    Id = element(2,Rec),
-    case kvs:get(Name, Id) of
-            {ok, _}    -> case Modify of
-                            true -> kvs:put(Rec);
-                            false -> skip
-                        end;
-            {error,_} ->  W = kvs:get_writer(Feed), 
-                        kvs:save(kvs:add(W#writer{args=Rec}))
-    end,
-    Id.
+remove(Rec,Feed) ->
+   {ok,W=#writer{count=Count}} = kvs:get(writer,Feed),
+   NC = Count-1,
+   kvs:save(W#writer{count=NC}),
+   NC.
+
+append(Rec,Feed) ->
+   kvs:ensure(#writer{id=Feed}),
+   Name = element(1,Rec),
+   Id = element(2,Rec),
+   case kvs:get(Name,Id) of
+        {ok,_}    -> Id;
+        {error,_} -> kvs:save(kvs:add((kvs:writer(Feed))#writer{args=Rec})), Id end.
 
 cut(_Feed,Id) ->
    case kvs:get(writer,Id) of

@@ -5,7 +5,6 @@
              table/1,tables/0,dir/0,initialize/2,seq/2,all/1,all/2,count/1,ver/0]).
 -include("metainfo.hrl").
 -spec seq(atom() | [], integer() | []) -> term().
--spec seq() -> term().
 -spec count(atom()) -> integer().
 -spec dir() -> list({'table',atom()}).
 -spec ver() -> {'version',string()}.
