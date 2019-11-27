@@ -76,3 +76,23 @@ seq(RecordName, Incr) -> Key = kvs_mnesia:seq(RecordName, Incr),
 create_table(_,_) -> [].
 add_table_index(_, _) -> ok.
 dump() -> ok.
+
+
+
+
+% stream 
+% next (#reader{cache=[]}) -> {error,empty};
+% next (#reader{feed=Feed,cache=I}=C) when is_tuple(I) ->
+%    Key = feed_key(I,Feed),
+%    rocksdb:iterator_move(I, {seek,Key}),
+%    case rocksdb:iterator_move(I, next) of
+%         {ok,_,Bin} -> C#reader{cache=bt(Bin)};
+%             {error,Reason} -> {error,Reason} end.
+
+% prev (#reader{cache=[]}) -> {error,empty};
+% prev (#reader{cache=I,id=Feed}=C) when is_tuple(I) ->
+%    Key = feed_key(I,Feed),
+%    rocksdb:iterator_move(I, {seek,Key}),
+%    case rocksdb:iterator_move(I, prev) of
+%         {ok,_,Bin} -> C#reader{cache=bt(Bin)};
+%             {error,Reason} -> {error,Reason} end.
