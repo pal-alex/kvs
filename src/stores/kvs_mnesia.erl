@@ -5,7 +5,7 @@
 -include_lib("mnesia/src/mnesia.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 -export(?BACKEND).
--export([info/1,exec/1,dump/1]).
+-export([info/1,exec/1,dump/1,seq/0]).
 start()    -> mnesia:start().
 stop()     -> mnesia:stop().
 destroy()  -> [mnesia:delete_table(T)||{_,T}<-kvs:dir()], mnesia:delete_schema([node()]), ok.

@@ -103,25 +103,53 @@ add(M,#writer{cache=[]}=C) ->
 %    N=sp(sn(M,[]),id(V)), P=sn(V,id(M)), kvs:put([N,P]),
 %    C#writer{cache=N,count=S+1}.
 
-add(M,#writer{cache=V1,count=S}=C) ->
-    {ok,V} = kvs:get(tab(V1),id(V1)),
-    N=sp(sn(M,[]),id(V)), P=sn(V,id(M)), kvs:put([N,P]),
+add(M, #writer{cache=V1,count=S}=C) ->
+    TabId = tab(V1),
+    ValueId = id(V1),
+    {V, VId} = case kvs:get(TabId, ValueId) of
+            {ok, V0} -> {V0, id(V0)};
+            {error,_} -> kvs:save(kvs:writer(TabId)), 
+                        {V1, ValueId} 
+        end,
+    N=sp(sn(M,[]), VId), 
+    P=sn(V, id(M)), 
+    kvs:put([N,P]),
     C#writer{cache=N,count=S+1}.
 
+remove(Rec,Feed) ->
+    {ok,W=#writer{count=Count}} = kvs:get(writer,Feed),
+    NC = Count-1,
+    kvs:save(W#writer{count=NC}),
+    NC.
+
 append(Rec,Feed) -> append(Rec, Feed, false).
-   
 append(Rec, Feed, Modify) -> 
-    Name = element(1,Rec),
-    Id = element(2,Rec),
-    case kvs:get(Name, Id) of
-            {ok, _}    -> case Modify of
-                            true -> kvs:put(Rec);
-                            false -> skip
-                        end;
-            {error,_} ->  W = kvs:get_writer(Feed), 
-                        kvs:save(kvs:add(W#writer{args=Rec}))
-    end,
-    Id.
+     Name = element(1,Rec),
+     Id = element(2,Rec),
+     % W = kvs:writer(Feed),
+     W = kvs:get_writer(Feed),
+     case kvs:get(Name, Id) of
+          {ok, _}    -> case Modify of
+                              true -> kvs:put(Rec); %raw_append(Rec,Feed), kvs:save(W#writer{cache=Rec,count=W#writer.count + 1});
+                              false -> skip
+                         end;
+          {error,_} ->  kvs:save(kvs:add(W#writer{args=Rec,cache=Rec}))
+     end,
+     Id.   
+
+
+% append(Rec, Feed, Modify) -> 
+%     Name = element(1,Rec),
+%     Id = element(2,Rec),
+%     case kvs:get(Name, Id) of
+%             {ok, _}    -> case Modify of
+%                             true -> kvs:put(Rec);
+%                             false -> skip
+%                         end;
+%             {error,_} ->  W = kvs:get_writer(Feed), 
+%                         kvs:save(kvs:add(W#writer{args=Rec}))
+%     end,
+%     Id.
 
 %append(Rec,Feed) ->
 %   kvs:ensure(#writer{id=Feed}),

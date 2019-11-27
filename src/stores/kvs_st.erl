@@ -3,9 +3,9 @@
 -include("kvs.hrl").
 -include("stream.hrl").
 -include("metainfo.hrl").
--compile(export_all).
-%-export(?STREAM).
-%-export([prev/8, append/3, ref/0,feed_key/2]).
+% -compile(export_all).
+-export(?STREAM).
+-export([prev/8, append/3, ref/0, feed_key/2]).
 
 bt(X) -> kvs_rocks:bt(X).
 ref() -> kvs_rocks:ref().
@@ -133,13 +133,14 @@ append(Rec,Feed) -> append(Rec, Feed, false).
 append(Rec, Feed, Modify) -> 
      Name = element(1,Rec),
      Id = element(2,Rec),
+     % W = kvs:writer(Feed),
+     W = kvs:get_writer(Feed),
      case kvs:get(Name, Id) of
           {ok, _}    -> case Modify of
-                              true -> raw_append(Rec,Feed), kvs:save(W#writer{cache=Rec,count=W#writer.count + 1});
+                              true -> kvs:put(Rec); %raw_append(Rec,Feed), kvs:save(W#writer{cache=Rec,count=W#writer.count + 1});
                               false -> skip
                          end;
-          {error,_} ->  W = kvs:get_writer(Feed), 
-                         kvs:save(kvs:add(W#writer{args=Rec,cache=Rec}))
+          {error,_} ->  kvs:save(kvs:add(W#writer{args=Rec,cache=Rec}))
      end,
      Id.
 

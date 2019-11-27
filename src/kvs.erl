@@ -143,7 +143,8 @@ index(Tab, Key, Value,#kvs{mod=DBA}) -> DBA:index(Tab, Key, Value).
 seq(#kvs{mod=DBA}) ->  DBA:seq().
 seq(Tab, Incr,#kvs{mod=DBA}) -> DBA:seq(Tab, Incr).
 dump(#kvs{mod=Mod}) -> Mod:dump().
-feed(Key,#kvs{st=Mod}=KVS) -> (Mod:take((kvs:reader(Key))#reader{args=-1}))#reader.args.
+% feed(Key,#kvs{st=Mod}=KVS) -> (Mod:take((kvs:reader(Key))#reader{args=-1}))#reader.args.
+feed(Key,#kvs{st=Mod}) -> Mod:feed(Key).
 remove(Rec,Feed) -> remove(Rec,Feed,#kvs{mod=dba(),st=kvs_stream()}).
 remove(Rec,Feed, #kvs{st=Mod}=KVS) -> Mod:remove(Rec,Feed).
 head(Key) -> case (kvs:take((kvs:reader(Key))#reader{args=1}))#reader.args of [X] -> X; [] -> [] end.
