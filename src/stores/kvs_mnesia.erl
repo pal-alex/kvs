@@ -2,10 +2,14 @@
 -include("backend.hrl").
 -include("kvs.hrl").
 -include("metainfo.hrl").
+-include("cursors.hrl").
+% -include("stream.hrl").
 -include_lib("mnesia/src/mnesia.hrl").
 -include_lib("stdlib/include/qlc.hrl").
--export(?BACKEND).
--export([info/1,exec/1,dump/1,seq/0]).
+% -export(?BACKEND).
+% -export([info/1,exec/1,dump/1,seq/0]).
+-compile(export_all).
+
 start()    -> mnesia:start().
 stop()     -> mnesia:stop().
 destroy()  -> [mnesia:delete_table(T)||{_,T}<-kvs:dir()], mnesia:delete_schema([node()]), ok.
@@ -81,3 +85,8 @@ dump_format(List) ->
     io:format("~20s ~32s ~14s ~10s~n~n",["NAME","STORAGE TYPE","MEMORY (MB)","ELEMENTS"]),
     [ io:format("~20s ~32w ~14.2f ~10b~n",[T,S,M,C]) || {T,{S,M,C}} <- List ],
     io:format("~nSnapshot taken: ~p~n",[calendar:now_to_datetime(os:timestamp())]).
+
+
+% stream
+next(#reader{cache={T,R}, pos=P}=C, KVS) -> kvs:n(kvs:get(T, R, KVS), C, P+1, KVS).
+prev(#reader{cache={T,R}, pos=P}=C, KVS) -> kvs:p(kvs:get(T, R, KVS), C, P-1, KVS).
