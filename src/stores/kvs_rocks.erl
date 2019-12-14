@@ -29,28 +29,21 @@ initialize() -> [ kvs:initialize(kvs_rocks,Module) || Module <- kvs:modules() ].
 ref() -> application:get_env(kvs,rocks_ref,[]).
 index(_,_,_) -> [].
 
-get1(Tab, Key) ->
-    Address = <<(list_to_binary(lists:concat(["/",format(Tab),"/"])))/binary,
-                (term_to_binary(Key))/binary>>,
-    io:format("KVS.GET1.Address: ~s~n",[Address]),
-    case rocksdb:get(ref(), Address, []) of
-         not_found -> {error,not_found};
-         {ok,Bin} -> {ok,bt(Bin)} end.
 get(Tab, Key) ->
-    Address = <<(lb(lists:concat(["/",format(Tab),"/"])))/binary,
-                (tb(Key))/binary>>,
-    io:format("KVS.GET.Address: ~s~n",[Address]),
+    Address = get_address(Tab, Key),
+    % io:format("KVS.GET.Address: ~s~n",[Address]),
     case rocksdb:get(ref(), Address, []) of
          not_found -> {error,not_found};
          {ok,Bin} -> {ok,bt(Bin)} end.
 
 put(Records) when is_list(Records) -> lists:foreach(fun(Record) -> put(Record) end, Records);
 put(Record) -> put(Record, Record).
-feed_key(Record, Feed) -> <<(lb("/" ++ kvs_rocks:format(Feed) ++ "/"))/binary,(tb(kvs:id(Record)))/binary>>.
+feed_key(Record, Feed) -> get_address(Feed, kvs:id(Record)).
+get_address(Tab, Id) -> <<(lb("/" ++ kvs_rocks:format(Tab) ++ "/"))/binary, (tb(Id))/binary>>.
 put(Records, Feed) when is_list(Records) -> lists:foreach(fun(Record) -> put(Record, Feed) end, Records);
 put(Record, Feed) -> 
     Address = feed_key(Record, Feed),
-    io:format("KVS.PUT.Address: ~s~n",[Address]),
+    % io:format("KVS.PUT.Address: ~s~n",[Address]),
     rocksdb:put(ref(), Address, tb(Record), [{sync,true}])
 .
 
@@ -88,8 +81,10 @@ next(_,_,_,_,_,T,_,_) -> T.
 seq() ->  erlang:integer_to_list(element(2,hd(lists:reverse(erlang:system_info(os_monotonic_time_source))))) .
 seq([],[]) -> seq(global_seq, 1); 
 seq(RecordName, Incr) -> Key = kvs_mnesia:seq(RecordName, Incr),
-                         io:format("new key ~p = ~p~n", [RecordName, Key]),
-                         integer_to_list(Key).
+                        %  io:format("new key ~p = ~p~n", [RecordName, Key]),
+                        %  integer_to_list(Key)
+                        Key
+                        .
 
 create_table(_,_) -> [].
 add_table_index(_, _) -> ok.
@@ -159,7 +154,7 @@ remove(Rec,Feed) ->
                 Count;
             _ -> C end.
 
-set_iterator(Feed) ->
+set_iterator(Feed, _First) ->
         Key = list_to_binary(lists:concat(["/",kvs_rocks:format(Feed)])),
         {ok,I} = rocksdb:iterator(ref(), []),
         {ok,K,BERT} = rocksdb:iterator_move(I, {seek,Key}),
@@ -187,3 +182,4 @@ cut(Feed,Id) ->
             {ok,A,X} -> {ok,prev(I,Key,size(Key),A,X,[],-1,0)};
                 _ -> {error,not_found} end.
         
+save_feed(Feed) -> ok.
