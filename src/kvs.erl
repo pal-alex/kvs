@@ -255,7 +255,8 @@ add(#writer{args=M, cache=[], id = Feed}=C, KVS) ->
     % put(N, KVS),
     C#writer{cache=N,count=1,first=N};
 add(#writer{args=M, cache=M}=C, _KVS) -> C;
-add(#writer{args=M, cache=V}=C, _KVS) when element(2, M) == element(2, V) -> C;
+add(#writer{args=M, cache=V, id = Feed}=C, KVS) when element(2, M) == element(2, V) -> 
+   update(C, M, V, Feed, KVS);
 add(#writer{args=M, cache=V, count=S, id = Feed}=C, KVS) ->
     % TabId = tab(V),
     N = sp(sn(M, []), id(V)), 
@@ -263,6 +264,16 @@ add(#writer{args=M, cache=V, count=S, id = Feed}=C, KVS) ->
     put([N,P], Feed, KVS),
     % put([N,P], KVS),
     C#writer{cache=N, count=S+1}.
+
+update(M, V, Feed, KVS) ->
+        N = sp(sn(M, en(V)), ep(V)),
+        put(N, Feed, KVS),
+        N
+.
+update(C, M, V, Feed, KVS) ->
+        N = update(M, V, Feed, KVS),
+        C#writer{cache=N}
+.
 
 save(#writer{}=W, KVS) -> NC = w4(W,[]), put(NC, KVS), NC;
 save(#reader{}=R, KVS) -> NC = r4(R,[]), put(NC, KVS), NC.
@@ -278,6 +289,7 @@ take(#reader{}=C, #kvs{mod=Mod}) -> Mod:take(C).
 
 remove(Rec, Feed, KVS) ->
     W = #writer{count=C} = writer(Feed, KVS),
+    % TODO: переделать - нужно изменять prev-next у окружения удаляемой записи 
     case delete(Feed, id(Rec), KVS) of
         ok -> Count = C - 1,
               save(W#writer{count = Count, cache = W#writer.first}),
@@ -290,6 +302,12 @@ append(Rec, Feed, Modify, KVS) ->
      Id = id(Rec),
      case {get(Name, Id, KVS), Modify} of
           {{ok, _}, false} -> skip;
+          {{ok, Value}, _} -> W0 = writer(Feed, true, KVS),
+                          Cache = W0#writer.cache,
+                          case is_tuple(Cache) andalso id(Cache) == Id of 
+                              true -> save(update(W0, Rec, Cache, Feed, KVS), KVS);
+                              false -> update(Rec, Value, Feed, KVS)
+                          end;
               _ ->  W0 = writer(Feed, true, KVS),
                     W = W0#writer{args=Rec},
                     WA = add(W, KVS),
