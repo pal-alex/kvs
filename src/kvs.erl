@@ -315,7 +315,24 @@ append(Rec, Feed, Modify, KVS) ->
      end,
      Id.   
 cut(Feed, Id, #kvs{mod=DBA}) -> DBA:cut(Feed, Id).
-
+move(Rec, FeedFrom, FeedTo) ->
+    KVS = #kvs{mod=dba()},
+    Value = kvs:fetch(FeedFrom, id(Rec)),
+    PrevId = ep(Value),
+    NextId = en(Value),
+    case {PrevId, NextId} of
+        {[], []} -> skip;
+        {[], _} -> Next = kvs:fetch(FeedFrom, NextId),
+                   put(sp(Next, []), KVS);
+        {_, []} -> Prev = kvs:fetch(FeedFrom, PrevId),
+                   put(sn(Prev, []), KVS);
+        _ -> Next = kvs:fetch(FeedFrom, NextId),
+             Prev = kvs:fetch(FeedFrom, PrevId),
+             put(sp(Next, PrevId), KVS),
+             put(sn(Prev, NextId), KVS)
+    end,
+    append(Rec, FeedTo, true, KVS)
+.
 
 
 % sugar

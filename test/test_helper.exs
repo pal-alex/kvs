@@ -5,39 +5,53 @@ ExUnit.start()
 defmodule BPE.Test do
   use ExUnit.Case, async: true
 
-  test "basic" do
-    id1 = {:basic, :kvs.seq([], [])}
-    id2 = {:basic, :kvs.seq([], [])}
-    x = 5
-    :kvs.save(:kvs.writer(id1))
-    :kvs.save(:kvs.writer(id2))
 
-    writer = Enum.reduce(:lists.seq(1, x), :kvs.writer(id1), fn id, writer0 ->
-                                                              :kvs.add(KVS.writer(writer0, args: {:"$msg", id, [], [], [], []}))
+  defmodule KVS.Test do
+    require KVS
+    use ExUnit.Case, async: true
+
+    test "basic" do
+      id1 = {:basic, :kvs.seq([], [])}
+      id2 = {:basic, :kvs.seq([], [])}
+      x = 5
+      :kvs.save(:kvs.writer(id1))
+      :kvs.save(:kvs.writer(id2))
+
+      Enum.each([id1, id2], fn id ->
+                              writer = Enum.reduce(:lists.seq(1, x), :kvs.writer(id), fn id0, writer0 ->
+                                                              :kvs.add(KVS.writer(writer0, args: {:"$msg", id0, [], [], [], []}))
                                                             end)
-    :kvs.save(writer)
+                             :kvs.save(writer)
+      end)
+      c = :kvs.feed(id1)
+      c1 = :kvs.all(:"$msg")
+      c0 = :lists.reverse(c)
+      assert c0 == c1
+      assert c != []
 
-    :lists.map(fn _ -> :kvs.append({:"$msg", [], [], [], [], []}, id2) end, :lists.seq(1, x))
-    r1 = :kvs.save(:kvs.reader(id1))
-    r2 = :kvs.save(:kvs.reader(id2))
-    x1 = :kvs.take(KVS.reader(:kvs.load_reader(KVS.reader(r1, :id)), args: 20))
-    x2 = :kvs.take(KVS.reader(:kvs.load_reader(KVS.reader(r2, :id)), args: 20))
-    b = :kvs.feed(id1)
+      r1 = :kvs.save(:kvs.reader(id1))
+      r2 = :kvs.save(:kvs.reader(id2))
+      x1 = :kvs.take(KVS.reader(:kvs.load_reader(KVS.reader(r1, :id)), args: 20))
+      x2 = :kvs.take(KVS.reader(:kvs.load_reader(KVS.reader(r2, :id)), args: 20))
 
-    # case :application.get_env(:kvs, :dba) do
-    #   :kvs_st ->
-        c = :kvs.all(id2)
-        assert :lists.reverse(c) == KVS.reader(x2, :args)
+      b = :kvs.feed(id2)
+      b1 = :kvs.all(:"$msg")
+      b0 = :lists.reverse(b)
 
-    #   _ ->
-    #     # mnesia doesn't support `all` over feeds (only for tables)
-    #     []
-    # end
+      assert b == KVS.reader(x2, :args)
+      assert b != []
 
-    assert KVS.reader(x1, :args) == b
-    assert length(KVS.reader(x1, :args)) == length(KVS.reader(x2, :args))
-    assert x == length(b)
-  end
+      #   _ ->
+      #     # mnesia doesn't support `all` over feeds (only for tables)
+      #     []
+      # end
+
+      assert KVS.reader(x1, :args) == b
+      assert length(KVS.reader(x1, :args)) == length(KVS.reader(x2, :args))
+      assert x == length(b)
+    end
+
+
 
   test "sym" do
     id = {:sym, :kvs.seq([], [])}
