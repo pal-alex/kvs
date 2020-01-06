@@ -26,7 +26,9 @@ has_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
 
 get_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
                                 Index = string:str(FieldsList, [Field]) + 1,
-                                element(Index, TableRecord).    
+                                element(Index, TableRecord).
+field(TableRecord, Field) -> get_field(TableRecord, Field).
+defined(TableRecord, Field) -> has_field(TableRecord, Field).    
 
 
 -record('$msg', {id,next,prev,user,msg}).
