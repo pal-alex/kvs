@@ -24,9 +24,14 @@ fields(Table)      -> T = table(Table),
 has_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
                                  lists:member(Field, FieldsList).
 
-get_field(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
-                                Index = string:str(FieldsList, [Field]) + 1,
+get_field({Table, Id}, Field) -> TableRecord = kvs:fetch(Table, Id),
+                                 Index = pos(TableRecord, Field),
+                                 element(Index, TableRecord); 
+get_field(TableRecord, Field) -> Index = pos(TableRecord, Field),
                                 element(Index, TableRecord).
+pos(TableRecord, Field) -> FieldsList = fields(element(1, TableRecord)),
+                           Pos = string:str(FieldsList, [Field]) + 1,
+                           Pos.                                
 field(TableRecord, Field) -> get_field(TableRecord, Field).
 defined(TableRecord, Field) -> has_field(TableRecord, Field).    
 
